@@ -1,0 +1,17 @@
+name: Check Anki source build
+on:
+  push:
+    branches:
+      - ci/anki-source-build-26-09
+  workflow_dispatch:
+permissions:
+  contents: read
+  attestations: write
+  artifact-metadata: write
+  id-token: write
+jobs:
+  anki:
+    uses: ./.github/workflows/json-build.yml
+    with:
+      packages: '[{"pkg":"anda/apps/anki/pkg","arch":"x86_64","labels":{"subrepo":"extras"}}]'
+      publish: false
