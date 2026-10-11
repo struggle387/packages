@@ -1,15 +1,15 @@
 Name:           anki
 Version:        26.09.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Flashcard program for using space repetition learning
 License:        AGPL-3.0-or-later AND GPL-3.0-or-later AND LGPL-3.0-or-later AND MIT AND BSD-3-Clause AND CC-BY-SA-3.0 AND CC-BY-3.0 AND Apache-2.0 AND CC-BY-2.5
 URL:            https://apps.ankiweb.net/
 Packager:       madonuko <mado@fyralabs.com>
-BuildRequires:  python3-devel python3-setuptools python3-waitress python3-protobuf python3-pysocks rpm_macro(fdupes)
-BuildRequires:  python3-distro python3-flask-cors python3-jsonschema python3-send2trash python3-certifi python3-simplejson
-BuildRequires:  python3-installer make cargo git rsync ninja-build libxcrypt-compat nodejs python3.9 python-unversioned-command gcc python3-pyqt6-webengine
-Requires:       hicolor-icon-theme python3-sqlalchemy python3-simplejson python3-matplotlib python3-decorator python3-markdown python3-send2trash
-Requires:       python3-requests python3-pygame python3-beautifulsoup4 python3-httplib2 python3-pyaudio python3-jsonschema sox libxcrypt-compat python3-pyqt6-webengine
+BuildRequires:  python3-devel >= 3.12
+BuildRequires:  pyproject-rpm-macros >= 1.23.0
+BuildRequires:  python3-pip python3-installer python3-packaging rpm_macro(fdupes) desktop-file-utils
+BuildRequires:  make cargo git rsync ninja-build libxcrypt-compat gcc gcc-c++ just
+Requires:       hicolor-icon-theme sox libxcrypt-compat python3-pyqt6 python3-pyqt6-webengine
 Recommends:     (mpv or mpv-nightly)
 Obsoletes:      anki <= 2.1.15
 Conflicts:      anki-qt5
@@ -22,50 +22,39 @@ Anki is based on a theory called spaced repetition.
 
 %prep
 %git_clone https://github.com/ankitects/anki
-%patch 0 -p1
-
-# See https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=anki
+%patch -P 0 -p1
 
 %build
+# Build the Python wheels without invoking upstream's release tooling.
 export RELEASE=1
-export PYTHONPATH=%_libdir/python3/dist-packages
-cargo update
-./tools/build
-
+just wheels
 
 %install
-for file in out/wheels/*.whl; do
-    python -m installer --destdir="%{buildroot}" $file
-done
+mkdir -p %{_pyproject_wheeldir}
+cp out/wheels/*.whl %{_pyproject_wheeldir}
+%pyproject_install
+%pyproject_save_files -D anki anki
+%pyproject_save_files -D aqt aqt _aqt
 
-install -Dm644 qt/bundle/lin/anki.desktop %{buildroot}/%{_datadir}/applications/anki.desktop
-install -Dm644 qt/bundle/lin/anki.png %{buildroot}/%{_datadir}/pixmaps/anki.png
+install -Dm644 'qt/installer/linux-template/{{ cookiecutter.format }}/{{ cookiecutter.app_name }}/anki.desktop' %{buildroot}/%{_datadir}/applications/anki.desktop
+install -Dm644 qt/aqt/data/qt/icons/anki.png %{buildroot}/%{_datadir}/pixmaps/anki.png
 
-sed "s*^#!/usr/bin/python\$*#!/usr/bin/python3*" %{buildroot}/%{_bindir}/anki > %{buildroot}/%{_bindir}/anki1
-rm %{buildroot}/%{_bindir}/anki
-mv %{buildroot}/%{_bindir}/anki1 %{buildroot}/%{_bindir}/anki
+%fdupes %{buildroot}%{python3_sitelib}/_aqt/data/
 
-find %{buildroot} -iname __pycache__ | xargs -r rm -rf
-find %{buildroot} -iname direct_url.json | xargs -r rm -rf
+%check
+desktop-file-validate %{buildroot}%{_datadir}/applications/anki.desktop
 
-chmod 755 %{buildroot}%{_bindir}/anki
-
-%fdupes %_libdir/python*/site-packages/_aqt/data/
-
-
-%files
+%files -f %{pyproject_files}-anki -f %{pyproject_files}-aqt
 %license LICENSE*
 %doc README*
 %{_bindir}/anki
+%{_bindir}/ankiw
 %{_datadir}/applications/anki.desktop
 %{_datadir}/pixmaps/anki.png
-%_libdir/python*/site-packages/aqt/
-%_libdir/python*/site-packages/aqt-%{version}.dist-info/
-%_libdir/python*/site-packages/_aqt/
-%_libdir/python*/site-packages/anki/
-%_libdir/python*/site-packages/anki-%{version}.dist-info/
-
 
 %changelog
+* Sat Oct 10 2026 Terra Packaging Team <terra@fyralabs.com> - 26.09.3-2
+- Update the source build and wheel installation for current Anki releases
+
 * Tue Jan 3 2023 madonuko <mado@fyralabs.com> - 2.1.60
 - Initial package
